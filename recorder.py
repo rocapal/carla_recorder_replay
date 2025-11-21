@@ -26,10 +26,10 @@ import random
 import pygame
 import numpy as np
 import sys
-
+import csv
 
 log_filename = "/tmp/town04_autopilot.log"
-
+CSVNAME = "speedTown4.csv"
 
 last_time = None
 count = 0
@@ -47,6 +47,12 @@ def game_loop():
     world = client.load_world('Town04')
 
     
+    # Speed CSV settings
+    csv_path = CSVNAME
+    csv_fh = open(csv_path, "w", newline="")
+    csv_writer = csv.writer(csv_fh)
+    csv_writer.writerow(["sim_time", "speed_m_s"])
+
     blueprint_library = world.get_blueprint_library()
 
     # Select vehicle
@@ -107,10 +113,15 @@ def game_loop():
 
     world.on_tick(on_tick)
 
-    
+    # Start time at 0 for the speed csv
+    snapshot = world.get_snapshot()               
+    t0 = snapshot.timestamp.elapsed_seconds
+
     try:
         while True:
             
+            rel_time = world.get_snapshot().timestamp.elapsed_seconds - t0
+
             # rate of this control loop
             clock.tick(30)
             
@@ -122,6 +133,11 @@ def game_loop():
                 screen.blit(image_surface, (0, 0))
 
             pygame.display.flip()
+
+            # Get vehicle speed
+            raw_vel = vehicle.get_velocity()
+            speed = float(np.linalg.norm([raw_vel.x, raw_vel.y, raw_vel.z]))
+            csv_writer.writerow([f"{rel_time:.6f}", f"{speed:.6f}"])
 
     except KeyboardInterrupt:
         print("Exit...")
@@ -139,7 +155,9 @@ def game_loop():
 
         if motorcycle is not None:
             motorcycle.destroy()
-        
+
+        csv_fh.flush()
+        csv_fh.close()
 
         pygame.quit()
         sys.exit()
