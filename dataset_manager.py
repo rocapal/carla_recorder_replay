@@ -153,8 +153,14 @@ class DatasetSaver:
         df_dst.loc[anchor_dst_idx:anchor_dst_idx + n - 1, dst_speed_col] = src_v[:n]
         df_dst.to_csv(dataset_csv, index=False)
 
-        # 5) Info
-        print("[INFO] Fitting per timestamp:")
-        print(f"  - first_src_time (vel CSV) = {first_src_time:.6f}")
-        print(f"  - timestamp(dataset)[anchor] = {dst_ts.iloc[anchor_dst_idx]:.6f} (idx={anchor_dst_idx})")
-        print(f"[OK] Cpied {n} speed data in '{dst_speed_col}' from {anchor_dst_idx} (sequential, ignored times from anchor.")
+        total_dataset_rows = len(df_dst)
+        total_speed_rows   = len(df_src)
+
+        diff = total_dataset_rows - total_speed_rows
+        if diff == 0:
+            print(f"[INFO] Same number of rows: dataset={total_dataset_rows}, speed_csv={total_speed_rows}")
+        else:
+            print(f"[WARN] Size difference between dataset and speed CSV:")
+            print(f"       dataset rows = {total_dataset_rows}")
+            print(f"       speed rows   = {total_speed_rows}")
+            print(f"       difference   = {diff} (dataset - speed)")
