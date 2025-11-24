@@ -20,7 +20,13 @@ def parse_args():
         required=True,
         help="Base directory where dataset is located"
     )
+    
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
+
     return parser.parse_args()
+
 
 # Plots for throttle, steer, speed 
 def render_plot(df, index, window=50):
