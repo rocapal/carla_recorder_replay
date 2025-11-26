@@ -198,25 +198,39 @@ def replay_loop(args, view="car"):
             pygame.display.flip()
 
             if dataset is not None:
-                # Generate dataset
-                hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
-                mask_y = cv2.inRange(hsv, np.array([18, 50, 150]), np.array([40, 255, 255]))
-                mask_w = cv2.inRange(hsv, np.array([0, 0, 200]),  np.array([180, 30, 255]))
-                mask_c = np.zeros(mask_w.shape, np.uint8); mask_c[mask_w>0]=1; mask_c[mask_y>0]=2
-                mask_rgb = np.zeros_like(rgb); mask_rgb[mask_c==1]=[255,255,255]; mask_rgb[mask_c==2]=[255,255,0]
+                # parse dataset type flags
+                types = args.dataset_types
+                save_all = "all" in types
+                do_mask = save_all or "mask" in types
+                do_rgb = save_all or "rgb" in types
 
-                # You can get the controls of the vehicule at each snapshot
-                # ctrl = vehicle.get_control()
-                # print(ctrl.throttle, ctrl.steer, ctrl.brake)
+                mask_rgb = None
 
+                # compute masks if enabled
+                if do_mask:
+                    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+                    mask_y = cv2.inRange(hsv, np.array([18, 50, 150]), np.array([40, 255, 255]))
+                    mask_w = cv2.inRange(hsv, np.array([0, 0, 200]),  np.array([180, 30, 255]))
+                    mask_c = np.zeros(mask_w.shape, np.uint8)
+                    mask_c[mask_w > 0] = 1
+                    mask_c[mask_y > 0] = 2
+                    mask_rgb = np.zeros_like(rgb)
+                    mask_rgb[mask_c == 1] = [255, 255, 255]
+                    mask_rgb[mask_c == 2] = [255, 255, 0]
 
+                # extract vehicle control data
                 ctrl = vehicle.get_control()
                 throttle = float(ctrl.throttle)
-                steer    = max(-1.0, min(1.0, float(ctrl.steer)))
-                brake    = float(ctrl.brake)
+                steer = max(-1.0, min(1.0, float(ctrl.steer)))
+                brake = float(ctrl.brake)
                 speed = 0.0
 
-                dataset.save_sample(rel_time, bgr, mask_rgb, throttle, steer, brake, speed)
+                # select outputs based on flags
+                image_out = bgr if do_rgb else None
+                mask_out = mask_rgb if do_mask else None
+
+                # save sample to dataset
+                dataset.save_sample(rel_time, image_out, mask_out, throttle, steer, brake, speed)
 
 
     except KeyboardInterrupt:

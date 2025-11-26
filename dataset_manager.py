@@ -65,11 +65,22 @@ class DatasetSaver:
         
         self.counter = self.counter + 1
 
-        cv2.imwrite(os.path.join(self.rgb_path,  rgb_filename),  bgr)
-        cv2.imwrite(os.path.join(self.mask_path, mask_filename), cv2.cvtColor(mask_rgb, cv2.COLOR_RGB2BGR))
+        rgb_str = ""
+        mask_str = ""
 
+        # save rgb only if image is provided
+        if bgr is not None:
+            cv2.imwrite(os.path.join(self.rgb_path,  rgb_filename),  bgr)
+            rgb_str = f"/{self.rgb_foldername}/{rgb_filename}"
+
+        # save mask only if image is provided
+        if mask_rgb is not None:
+            cv2.imwrite(os.path.join(self.mask_path, mask_filename), cv2.cvtColor(mask_rgb, cv2.COLOR_RGB2BGR))
+            mask_str = f"/{self.mask_foldername}/{mask_filename}"
+
+        # write entry to csv
         with open(self.csv_filename, "a", newline="") as f:
-            csv.writer(f).writerow([f"/{self.rgb_foldername}/{rgb_filename}", f"/{self.mask_foldername}/{mask_filename}", timestamp,
+            csv.writer(f).writerow([rgb_str, mask_str, timestamp,
                                     throttle, steer, brake, speed])        
      
 
