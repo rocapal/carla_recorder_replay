@@ -124,7 +124,7 @@ def game_loop(args):
         fps_server = 1.0 / snapshot.timestamp.delta_seconds
         print(f"Frame {snapshot.frame} | Server ~{fps_server:.1f} Hz  ", end="\r")
 
-    world.on_tick(on_tick)
+    callback_id = world.on_tick(on_tick)
 
     # Start time at 0 for the speed csv
     snapshot = world.get_snapshot()               
@@ -158,6 +158,8 @@ def game_loop(args):
 
     finally:
         
+        world.remove_on_tick(callback_id)
+
         client.stop_recorder()
         
         if camera is not None:
