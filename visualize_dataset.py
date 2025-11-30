@@ -1,6 +1,23 @@
-#-------------------------------------------------
-#----Visualize dataset generated from replay.py---
-#-------------------------------------------------
+#!/usr/bin/env python3
+#
+#
+#  Copyright (C) URJC DeepRacer
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see http://www.gnu.org/licenses/. 
+#
+#  Author :  Sergio Robledo <s.robledo.2021 at alumnos dot urjc dot es>
+
 
 import os
 import time
@@ -11,14 +28,16 @@ import matplotlib.backends.backend_agg as agg
 import argparse
 import sys
 
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Visualize the dataset generated from replay.py"
     )
     parser.add_argument(
-        "--base_path",
+        "--path",
         required=True,
-        help="Base directory where dataset is located"
+        help="Path to the dataset directory"
     )
     
     if len(sys.argv) == 1:
@@ -72,7 +91,7 @@ def render_plot(df, index, window=50):
 
 def main():
     args = parse_args()
-    BASE_PATH = args.base_path
+    BASE_PATH = args.path
 
     CSV_PATH = os.path.join(BASE_PATH, "dataset.csv")
     if not os.path.isfile(CSV_PATH):
