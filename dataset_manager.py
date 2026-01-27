@@ -132,6 +132,7 @@ class DatasetSaver:
                             src_speed_col: str = "speed_m_s",
                             src_time_col: str = "sim_time"):
 
+        # 1) Check files
         if not os.path.isfile(dataset_csv):
             print(f"[ERROR] Dataset {dataset_csv} does not exist")
             return
@@ -139,9 +140,11 @@ class DatasetSaver:
             print(f"[ERROR] Speed CSV does not exist: {speed_csv}")
             return
 
+        # 2) Loading
         df_dst = pd.read_csv(dataset_csv)
         df_src = pd.read_csv(speed_csv)
 
+        # 3) Check necessary columns
         for col in ["timestamp", dst_speed_col]:
             if col not in df_dst.columns:
                 print(f"[ERROR] Dataset does not have col '{col}'.")
@@ -154,6 +157,7 @@ class DatasetSaver:
             print("[WARN] Empty Dataset or speed CSV")
             return
 
+        # 4) Number conversion
         df_dst = df_dst.copy()
         df_src = df_src.copy()
 
@@ -168,9 +172,11 @@ class DatasetSaver:
             print("[WARN] NaN data filtered and no data left.")
             return
 
+        # 5) Order by time
         df_dst_sorted = df_dst.sort_values("timestamp").reset_index(drop=False)
         df_src_sorted = df_src.sort_values(src_time_col).reset_index(drop=True)
 
+        # 6) Align using merge_asof
         merged = pd.merge_asof(
             df_dst_sorted,
             df_src_sorted[[src_time_col, src_speed_col]],
@@ -179,10 +185,13 @@ class DatasetSaver:
             direction="nearest"
         )
 
+        # 7) Set aligned speed in the original DataFrame
         df_dst.loc[merged["index"], dst_speed_col] = merged[src_speed_col].values
 
+        # 8) Keep updated data
         df_dst.to_csv(dataset_csv, index=False)
 
+        # 9) Info
         time_diff = np.abs(merged["timestamp"] - merged[src_time_col])
         print(f"[INFO] Speed alignment")
         print(f"  - Nº rows dataset:   {len(df_dst)}")
