@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see [http://www.gnu.org/licenses/](http://www.gnu.org/licenses/). 
 #
-#  Author : Roberto Calvo Palomino <roberto.calvo at urjc dot es
+#  Author : Roberto Calvo Palomino <roberto.calvo at urjc dot es>
 #           Sergio Robledo <s.robledo.2021 at alumnos dot urjc dot es>
 
 import carla
@@ -48,12 +48,10 @@ CUSTOM_MAPPING = {
 }
 MAX_CUSTOM_LABELS = 7
 
-def convert_to_equidistant_gray(image_array, num_classes):
-    if num_classes < 2: 
-        return np.zeros_like(image_array, dtype=np.uint8)
-    
-    factor = 255.0 / (num_classes - 1)
-    return (image_array * factor).astype(np.uint8)
+def format_carla_semseg_bgr(image_array):
+    output = np.zeros((image_array.shape[0], image_array.shape[1], 3), dtype=np.uint8)
+    output[:, :, 2] = image_array
+    return output
 
 def apply_custom_mapping(raw_semseg):
     output = np.zeros_like(raw_semseg, dtype=np.uint8)
@@ -233,11 +231,11 @@ def replay_loop(args, view="car"):
 
                 if raw_semseg_img is not None:
                     if do_semseg:
-                        out_semseg = convert_to_equidistant_gray(raw_semseg_img, num_classes=29)
+                        out_semseg = format_carla_semseg_bgr(raw_semseg_img)
 
                     if do_custom:
                         mapped = apply_custom_mapping(raw_semseg_img)
-                        out_custom = convert_to_equidistant_gray(mapped, num_classes=MAX_CUSTOM_LABELS)
+                        out_custom = format_carla_semseg_bgr(mapped)
 
                 if do_mask:
                     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
