@@ -14,11 +14,10 @@
 #  GNU General Public License for more details.
 #
 #  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see http://www.gnu.org/licenses/. 
+#  along with this program.  If not, see [http://www.gnu.org/licenses/](http://www.gnu.org/licenses/). 
 #
-#  Author : Roberto Calvo Palomino <roberto.calvo at urjc dot es
+#  Author : Roberto Calvo Palomino <roberto.calvo at urjc dot es>
 #           Sergio Robledo <s.robledo.2021 at alumnos dot urjc dot es>
-
 
 import carla
 import pygame
@@ -38,6 +37,30 @@ from dataset_manager import DatasetSaver
 
 RATE_CONTROL_LOOP = 30
 
+CUSTOM_MAPPING = {
+    0: [11],
+    1: [14],
+    2: [34],
+    3: [0, 30],
+    4: [33],
+    5: [31],
+    6: [25, 29]
+}
+MAX_CUSTOM_LABELS = 7
+
+def format_carla_semseg_bgr(image_array):
+    output = np.zeros((image_array.shape[0], image_array.shape[1], 3), dtype=np.uint8)
+    output[:, :, 2] = image_array
+    return output
+
+def apply_custom_mapping(raw_semseg):
+    output = np.zeros_like(raw_semseg, dtype=np.uint8)
+    
+    for new_label, old_labels_list in CUSTOM_MAPPING.items():
+        mask = np.isin(raw_semseg, old_labels_list)
+        output[mask] = new_label
+        
+    return output
 
 def get_log_duration(client, log_file):
     import re           
@@ -77,8 +100,12 @@ def replay_loop(args, view="car"):
     print(f"Replaying: {log_filename}, duration: {duration:.2f} s")
 
     dataset = None
-    if args.generate_dataset_path is not None:        
-        dataset = DatasetSaver(args.generate_dataset_path)
+    enable_semseg = False
+    if args.generate_dataset_path is not None:
+        types = args.dataset_types
+        save_all = "all" in types
+        enable_semseg = save_all or "semseg" in types or "custom_semseg" in types
+        dataset = DatasetSaver(args.generate_dataset_path, enable_semseg=enable_semseg)
     
     client.replay_file(log_filename, 0, 0, 0)
 
@@ -105,6 +132,16 @@ def replay_loop(args, view="car"):
     camera_transform = carla.Transform(carla.Location(x=0.8, z=1.7))
     camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
 
+    sem_camera = None
+    sem_queue = None
+    if enable_semseg:
+        sem_bp = blueprint_library.find("sensor.camera.semantic_segmentation")
+        sem_bp.set_attribute("image_size_x", str(display_width))
+        sem_bp.set_attribute("image_size_y", str(display_height))
+        sem_bp.set_attribute("fov", "90")
+        sem_camera = world.spawn_actor(sem_bp, camera_transform, attach_to=vehicle)
+        sem_queue = Queue(maxsize=1)
+
     frame_q = Queue(maxsize=1)   # save (rgb, bgr, (w, h))
 
     def _safe_put(q: Queue, item):
@@ -125,6 +162,8 @@ def replay_loop(args, view="car"):
         _safe_put(frame_q, (rgb, bgr, (image.width, image.height)))
 
     camera.listen(lambda img: process_image(img))
+    if sem_camera is not None:
+        sem_camera.listen(lambda img: _safe_put(sem_queue, img))
 
     clock = pygame.time.Clock()
 
@@ -152,6 +191,16 @@ def replay_loop(args, view="car"):
                         raise KeyboardInterrupt
                 continue
 
+            raw_semseg_img = None
+            if sem_queue is not None:
+                try:
+                    sem_data = sem_queue.get(timeout=0.2)
+                    sem_arr = np.frombuffer(sem_data.raw_data, dtype=np.uint8)
+                    sem_arr = np.reshape(sem_arr, (sem_data.height, sem_data.width, 4))
+                    raw_semseg_img = sem_arr[:, :, 2] 
+                except queue.Empty:
+                    pass
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     raise KeyboardInterrupt
@@ -162,7 +211,6 @@ def replay_loop(args, view="car"):
 
             rel_time = sim_time - t0_sim
 
-            
             #if image_surface is not None:
             surface = pygame.surfarray.make_surface(rgb.swapaxes(0, 1))
             screen.blit(surface, (0, 0))
@@ -170,26 +218,50 @@ def replay_loop(args, view="car"):
             pygame.display.flip()
 
             if dataset is not None:
-                # Generate dataset
-                hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
-                mask_y = cv2.inRange(hsv, np.array([18, 50, 150]), np.array([40, 255, 255]))
-                mask_w = cv2.inRange(hsv, np.array([0, 0, 200]),  np.array([180, 30, 255]))
-                mask_c = np.zeros(mask_w.shape, np.uint8); mask_c[mask_w>0]=1; mask_c[mask_y>0]=2
-                mask_rgb = np.zeros_like(rgb); mask_rgb[mask_c==1]=[255,255,255]; mask_rgb[mask_c==2]=[255,255,0]
+                types = args.dataset_types
+                save_all = "all" in types
+                do_mask = save_all or "mask" in types
+                do_rgb = save_all or "rgb" in types
+                do_semseg = save_all or "semseg" in types
+                do_custom = save_all or "custom_semseg" in types
+
+                mask_rgb = None
+                out_semseg = None
+                out_custom = None
+
+                if raw_semseg_img is not None:
+                    if do_semseg:
+                        out_semseg = format_carla_semseg_bgr(raw_semseg_img)
+
+                    if do_custom:
+                        mapped = apply_custom_mapping(raw_semseg_img)
+                        out_custom = format_carla_semseg_bgr(mapped)
+
+                if do_mask:
+                    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+                    mask_y = cv2.inRange(hsv, np.array([18, 50, 150]), np.array([40, 255, 255]))
+                    mask_w = cv2.inRange(hsv, np.array([0, 0, 200]),  np.array([180, 30, 255]))
+                    mask_c = np.zeros(mask_w.shape, np.uint8)
+                    mask_c[mask_w > 0] = 1
+                    mask_c[mask_y > 0] = 2
+                    mask_rgb = np.zeros_like(rgb)
+                    mask_rgb[mask_c == 1] = [255, 255, 255]
+                    mask_rgb[mask_c == 2] = [255, 255, 0]
 
                 # You can get the controls of the vehicule at each snapshot
                 # ctrl = vehicle.get_control()
                 # print(ctrl.throttle, ctrl.steer, ctrl.brake)
 
-
                 ctrl = vehicle.get_control()
                 throttle = float(ctrl.throttle)
-                steer    = max(-1.0, min(1.0, float(ctrl.steer)))
-                brake    = float(ctrl.brake)
+                steer = max(-1.0, min(1.0, float(ctrl.steer)))
+                brake = float(ctrl.brake)
                 speed = 0.0
 
-                dataset.save_sample(rel_time, bgr, mask_rgb, throttle, steer, brake, speed)
+                image_out = bgr if do_rgb else None
+                mask_out = mask_rgb if do_mask else None
 
+                dataset.save_sample(rel_time, image_out, mask_out, throttle, steer, brake, speed, out_semseg, out_custom)
 
     except KeyboardInterrupt:
         print("Exit...")
@@ -199,6 +271,10 @@ def replay_loop(args, view="car"):
         if camera is not None:
             camera.stop()
             camera.destroy()
+
+        if sem_camera is not None:
+            sem_camera.stop()
+            sem_camera.destroy()
 
         vehicle.destroy()
         
@@ -215,13 +291,10 @@ def replay_loop(args, view="car"):
 
             dataset.adjust_speed(csv_data_filename)
 
-
         pygame.quit()
         sys.exit()
 
-
 if __name__ == "__main__":
-
 
     parser = argparse.ArgumentParser(description="recorder")
 
@@ -240,11 +313,11 @@ if __name__ == "__main__":
     parser.add_argument(
                         "--dataset_types", "--carla-dataset-types",
                         nargs="+",
-                        choices=["rgb", "mask", "segmented", "all"],
+                        choices=["rgb", "mask", "semseg", "custom_semseg", "all"],
                         default=["all"],
                         metavar="TYPE",
                         help=(
-                            "Types of frames to export. Options: rgb, mask, segmented, all. "
+                            "Types of frames to export. Options: rgb, mask, semseg, custom_semseg, all. "
                             "Example: --dataset_types rgb mask"
                         )
                     )

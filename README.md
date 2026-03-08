@@ -5,6 +5,7 @@
 
 This code illustrates how to use the recorder and replay functions in **CARLA (0.9.15)** simulator. Please refer to the [official documentation](https://carla.readthedocs.io/en/latest/adv_recorder/) for more details.
 
+
 ---
 
 ## ⏺️ Recorder
@@ -44,6 +45,10 @@ options:
                         Spawn an additional actor in front of the ego-vehicle
 ```
 
+```
+python3 recorder.py --log_path ./test --town Town04 --port 3010
+```
+
 **recorder.py** saves data as following (in the specified log_path):
 ```
 
@@ -77,13 +82,38 @@ To create datasets while replay the log, execute as follows:
 
 ```bash
 python3 replay.py --log_path logs/1763717922_Town04/ --generate_dataset_path /tmp/
+```
 
+The latter will create a dataset ready to use:
+
+```bash
 $ ls /tmp/1763718805717_dataset/
 
 -rw-rw-r--    31679 nov 21 10:53 dataset.csv
 drwxrwxr-x    20480 nov 21 10:53 mask
 drwxrwxr-x    12288 nov 21 10:53 rgb
+# If semantic segmentation is enabled:
+drwxrwxr-x    12288 nov 21 10:53 semseg
+drwxrwxr-x    12288 nov 21 10:53 custom_semseg
 ```
+
+### Semantic Segmentation (`semseg` vs `custom_semseg`)
+
+When using `--dataset_types semseg custom_semseg all` in **replay.py**, the script can extract semantic segmentation images from CARLA. Two different directories can be generated, each with its own `labels.json` mapping the pixel values to their respective classes:
+
+1. **`semseg`:** Provides the original, unedited semantic segmentation data directly from CARLA, preserving its 29 default categories:
+   - `0: Unlabeled`, `1: Roads`, `2: SideWalks`, `3: Building`, `4: Wall`, `5: Fence`, `6: Pole`, `7: TrafficLight`, `8: TrafficSign`, `9: Vegetation`, `10: Terrain`, `11: Sky`, `12: Pedestrian`, `13: Rider`, `14: Car`, `15: Truck`, `16: Bus`, `17: Train`, `18: Motorcycle`, `19: Bicycle`, `20: Static`, `21: Dynamic`, `22: Other`, `23: Water`, `24: RoadLine`, `25: Ground`, `26: Bridge`, `27: RailTrack`, `28: GuardRail`
+
+2. **`custom_semseg`:** Provides a mapped and simplified version of the original semantic data (typically used for GAIA project), grouping the original 29 classes into 8 key macro-categories designed for autonomous driving tasks:
+   - `0: Background` *(Unlabeled, Sky, Static, Dynamic, Other, Water)*
+   - `1: Road` *(Roads, RoadLine, Ground, RailTrack)*
+   - `2: Sidewalk` *(SideWalks)*
+   - `3: Obstacles` *(Building, Wall, Fence, Bridge, GuardRail)*
+   - `4: Vegetation` *(Vegetation, Terrain)*
+   - `5: Poles_and_Signs` *(Pole, TrafficLight, TrafficSign)*
+   - `6: Vehicles` *(Car, Truck, Bus, Train, Motorcycle, Bicycle)*
+   - `7: Pedestrians` *(Pedestrian, Rider)*
+
 
 ## ⚙️ CARLA Simulator
 
