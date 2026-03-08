@@ -23,9 +23,53 @@ import os
 import time
 import csv
 import cv2
+import json
 
 import numpy as np
 import pandas as pd
+
+CARLA_SEMSEG_LABELS = {
+    "0": "Unlabeled",
+    "1": "Roads",
+    "2": "SideWalks",
+    "3": "Building",
+    "4": "Wall",
+    "5": "Fence",
+    "6": "Pole",
+    "7": "TrafficLight",
+    "8": "TrafficSign",
+    "9": "Vegetation",
+    "10": "Terrain",
+    "11": "Sky",
+    "12": "Pedestrian",
+    "13": "Rider",
+    "14": "Car",
+    "15": "Truck",
+    "16": "Bus",
+    "17": "Train",
+    "18": "Motorcycle",
+    "19": "Bicycle",
+    "20": "Static",
+    "21": "Dynamic",
+    "22": "Other",
+    "23": "Water",
+    "24": "RoadLine",
+    "25": "Ground",
+    "26": "Bridge",
+    "27": "RailTrack",
+    "28": "GuardRail"
+}
+
+CUSTOM_SEMSEG_LABELS = {
+    "0": "Background",
+    "1": "Road",
+    "2": "Sidewalk",
+    "3": "Obstacles",
+    "4": "Vegetation",
+    "5": "Poles_and_Signs",
+    "6": "Vehicles",
+    "7": "Pedestrians"
+}
 
 class DatasetSaver:
 
@@ -55,6 +99,12 @@ class DatasetSaver:
             self.custom_path = os.path.join(self.dataset_path, self.custom_foldername)
             os.makedirs(self.semseg_path, exist_ok=True)
             os.makedirs(self.custom_path, exist_ok=True)
+
+            with open(os.path.join(self.semseg_path, "labels.json"), "w") as f:
+                json.dump(CARLA_SEMSEG_LABELS, f, indent=4)
+            
+            with open(os.path.join(self.custom_path, "labels.json"), "w") as f:
+                json.dump(CUSTOM_SEMSEG_LABELS, f, indent=4)
 
         self.counter = 0
 

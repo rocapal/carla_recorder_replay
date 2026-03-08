@@ -53,7 +53,7 @@ def game_loop(args):
 
     world = client.load_world(args.town)
 
-    log_path = args.log_path + "/" + str(int(time.time())) + "_" + args.town + "/"
+    log_path = os.path.abspath(args.log_path) + "/" + str(int(time.time())) + "_" + args.town + "/"
     os.makedirs(log_path, exist_ok=True)
 
     # Speed CSV settings    
